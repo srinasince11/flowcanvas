@@ -35,4 +35,17 @@ public record AiProperties(
     public boolean isRemote() {
         return "openai".equals(provider);
     }
+
+    /**
+     * Never prints the key. A record's generated {@code toString} includes every component,
+     * so without this override a single {@code log.info("{}", properties)} or an exception
+     * message built from this object would write the key to the logs in plain text.
+     */
+    @Override
+    public String toString() {
+        return "AiProperties[provider=" + provider + ", baseUrl=" + baseUrl + ", apiKey="
+                + (apiKey == null || apiKey.isBlank() ? "<not set>" : "<redacted>")
+                + ", model=" + model + ", timeoutSeconds=" + timeoutSeconds
+                + ", maxRetries=" + maxRetries + "]";
+    }
 }
