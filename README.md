@@ -7,7 +7,7 @@
 **React Flow** · **Spring Boot** · **PostgreSQL** · **Docker**
 
 [![Backend tests](https://img.shields.io/badge/backend-77%20tests%20passing-22c55e?style=flat-square)](backend/src/test)
-[![Frontend tests](https://img.shields.io/badge/frontend-51%20tests%20passing-22c55e?style=flat-square)](frontend/src/test)
+[![Frontend tests](https://img.shields.io/badge/frontend-56%20tests%20passing-22c55e?style=flat-square)](frontend/src/test)
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](backend/pom.xml)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
@@ -53,7 +53,9 @@ is one environment variable away.
 
 | | |
 |---|---|
-| **Interactive canvas** | Create, move, connect, configure and delete nodes on a [React Flow](https://github.com/xyflow/xyflow) canvas (MIT). Four typed nodes: Text Input, Prompt Template, AI Model and Output. |
+| **Interactive canvas** | Drag parts onto a [React Flow](https://github.com/xyflow/xyflow) canvas (MIT) and wire their sockets; cables take the colour of the part that drives them. Four typed nodes: Text Input, Prompt Template, AI Model and Output. |
+| **Run trace** | Every run is drawn as a waterfall: one bar per node at its real start time and duration, growing live while it runs. Ordering, the slow node and an isolated failure are visible at a glance; click a bar to read that node's output. |
+| **Live problems** | The same rules as the server run on every edit. Problems are listed as you work, the offending node is outlined, and clicking a problem takes you to it. |
 | **Real validation** | Cycle detection with the exact cycle named in edge order, per-node connection rules, dangling and duplicate edges, unique node keys, and **static checking of template variables** — a `{{typo}}` is caught while editing, before any model is called. Validated client-side for instant feedback and again on the server, which is the authority. |
 | **Fan-out / fan-in** | Branches run independently and a Prompt Template can join them by key: `Arguments for: {{advocate}} / against: {{critic}}`. Variables are lexically scoped to a node's ancestors, so a template never depends on tie-breaking. |
 | **Dependency-ordered execution** | Kahn's topological sort with deterministic tie-breaking. A node only runs once every predecessor has produced a value. |
@@ -64,7 +66,7 @@ is one environment variable away.
 | **Pluggable, resilient AI** | An `AiProvider` interface with a deterministic offline mock (default) and an OpenAI-compatible provider with request timeouts and retries with exponential backoff on `429`/`5xx`/network errors (honouring `Retry-After`), but none on `4xx`. |
 | **Crash-safe runs** | A run always terminates: unexpected failures mark it `FAILED`, and runs orphaned by a restart are closed at startup instead of spinning forever. |
 | **No secrets in the repo** | Credentials come from the environment. `.env` is git-ignored; `.env.example` documents every variable. |
-| **Real tests** | 77 backend tests (integration tests against a real embedded PostgreSQL, and the AI client against a real local HTTP server) and 51 frontend tests. |
+| **Real tests** | 77 backend tests (integration tests against a real embedded PostgreSQL, and the AI client against a real local HTTP server) and 56 frontend tests. |
 | **One-command setup** | `docker compose up --build` starts the database, the API and the frontend. CI runs the whole suite on every push. |
 
 ---
@@ -120,7 +122,7 @@ Full rationale, including the trade-offs: **[docs/architecture.md](docs/architec
 ### With Docker (recommended)
 
 ```bash
-git clone https://github.com/<your-username>/flowcanvas.git
+git clone https://github.com/srinasince11/flowcanvas.git
 cd flowcanvas
 
 cp .env.example .env          # every value has a safe default — no edits needed
@@ -293,7 +295,7 @@ flowcanvas/
 │   │   ├── api/          typed fetch client
 │   │   ├── components/   Canvas · Toolbar · Inspector · RunPanel · ValidationPanel · …
 │   │   ├── nodes/        FlowNodes · definitions · graph rules · node keys
-│   │   ├── test/         51 tests
+│   │   ├── test/         56 tests
 │   │   ├── App.tsx       application root and state
 │   │   └── styles.css    the design system
 │   └── vite.config.ts
@@ -452,7 +454,7 @@ Full schema, constraints and indexes: **[docs/database-schema.md](docs/database-
 
 ```bash
 cd backend  && mvn test        # 77 tests
-cd frontend && npm run test     # 51 tests
+cd frontend && npm run test     # 56 tests
 ```
 
 | Layer | Tool | What it proves |

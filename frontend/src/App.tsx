@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection, type Edge, type EdgeChange, type Node, type NodeChange } from '@xyflow/react';
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Connection,
+  type Edge,
+  type EdgeChange,
+  type Node,
+  type NodeChange,
+  type XYPosition,
+} from '@xyflow/react';
 
 import { ApiError, api, fromApiExample, fromApiWorkflow } from './api/client';
 import { CanvasProvider } from './components/Canvas';
+import { Dock, type DockTab } from './components/Dock';
 import { Inspector } from './components/Inspector';
 import { NodePalette } from './components/NodePalette';
 import { RunPanel } from './components/RunPanel';
@@ -70,9 +81,14 @@ export default function App() {
   const [search, setSearch] = useState('');
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [issues, setIssues] = useState<GraphIssue[]>([]);
   const [validating, setValidating] = useState(false);
-  const [lastChecked, setLastChecked] = useState<string | null>(null);
+  /** Bumped by every edit that can change validity; server results are tied to a version. */
+  const [graphVersion, setGraphVersion] = useState(0);
+  const [serverIssues, setServerIssues] = useState<{ version: number; issues: GraphIssue[] } | null>(null);
+  const [dockTab, setDockTab] = useState<DockTab>('run');
+  const [fitKey, setFitKey] = useState(0);
+  const [focus, setFocus] = useState<{ nodeId: string; seq: number } | null>(null);
+  const viewCenterRef = useRef<(() => XYPosition) | null>(null);
 
   const [execution, setExecution] = useState<ApiExecution | null>(null);
   const [running, setRunning] = useState(false);
@@ -88,6 +104,8 @@ export default function App() {
    */
   const pollGeneration = useRef(0);
   const searchTimer = useRef<number | null>(null);
+  /** Read by the keyboard shortcut, which must not re-subscribe on every edit. */
+  const canRunRef = useRef(false);
 
   const stopPolling = useCallback(() => {
     pollGeneration.current += 1;
@@ -96,6 +114,12 @@ export default function App() {
       pollTimer.current = null;
     }
     setRunning(false);
+  }, []);
+
+  /** Records an edit to the graph: unsaved, and any server verdict is now stale. */
+  const markChanged = useCallback(() => {
+    setDirty(true);
+    setGraphVersion((version) => version + 1);
   }, []);
 
   const loadHistory = useCallback(async (id: string | null) => {
@@ -157,31 +181,34 @@ export default function App() {
   const onNodesChange = useCallback((changes: NodeChange<Node>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
     if (changes.some((change) => change.type !== 'select' && change.type !== 'dimensions')) {
-      setDirty(true);
+      markChanged();
     }
-  }, []);
+  }, [markChanged]);
 
   const onEdgesChange = useCallback((changes: EdgeChange<Edge>[]) => {
     setEdges((current) => applyEdgeChanges(changes, current));
-    if (changes.length > 0) {
-      setDirty(true);
+    if (changes.some((change) => change.type !== 'select')) {
+      markChanged();
     }
-  }, []);
+  }, [markChanged]);
 
   const onConnect = useCallback((connection: Connection) => {
     setEdges((current) => addEdge({ ...connection, id: newId() }, current));
-    setDirty(true);
-  }, []);
+    markChanged();
+  }, [markChanged]);
 
-  const onAddNode = useCallback((type: NodeType) => {
+  const onAddNode = useCallback((type: NodeType, at?: XYPosition) => {
     const definition = NODE_TYPE_DEFINITIONS[type];
     const id = newId();
+    // A clicked part lands in the middle of the view, nudged so repeated clicks do not stack.
+    const centre = viewCenterRef.current?.() ?? { x: 120, y: 120 };
+    const position = at ?? { x: centre.x + (Math.random() - 0.5) * 60, y: centre.y + (Math.random() - 0.5) * 60 };
     setNodes((current) => [
       ...current,
       {
         id,
         type,
-        position: { x: 120 + Math.random() * 120, y: 120 + Math.random() * 160 },
+        position,
         data: {
           // A short, readable, unique key — what templates use to reference this node.
           key: suggestKey(type, current),
@@ -192,22 +219,22 @@ export default function App() {
       },
     ]);
     setSelectedNodeId(id);
-    setDirty(true);
-  }, []);
+    markChanged();
+  }, [markChanged]);
 
   const onRenameKey = useCallback((nodeId: string, key: string) => {
     setNodes((current) =>
       current.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, key } } : node)),
     );
-    setDirty(true);
-  }, []);
+    markChanged();
+  }, [markChanged]);
 
   const onDeleteNode = useCallback((nodeId: string) => {
     setNodes((current) => current.filter((node) => node.id !== nodeId));
     setEdges((current) => current.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
     setSelectedNodeId((current) => (current === nodeId ? null : current));
-    setDirty(true);
-  }, []);
+    markChanged();
+  }, [markChanged]);
 
   const onUpdateNodeConfig = useCallback((nodeId: string, patch: Record<string, unknown>) => {
     setNodes((current) =>
@@ -222,26 +249,24 @@ export default function App() {
         };
       }),
     );
-    setDirty(true);
-  }, []);
+    markChanged();
+  }, [markChanged]);
 
   const onRenameNode = useCallback((nodeId: string, label: string) => {
     setNodes((current) =>
       current.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, label } } : node)),
     );
-    setDirty(true);
-  }, []);
+    markChanged();
+  }, [markChanged]);
 
   const onClearGraph = useCallback(() => {
     stopPolling();
     setNodes([]);
     setEdges([]);
     setSelectedNodeId(null);
-    setIssues([]);
     setExecution(null);
-    setLastChecked(null);
-    setDirty(true);
-  }, [stopPolling]);
+    markChanged();
+  }, [stopPolling, markChanged]);
 
   /** Puts a graph on the canvas, replacing whatever was there and any run being followed. */
   const showGraph = useCallback(
@@ -252,11 +277,13 @@ export default function App() {
       setNodes(graph.nodes);
       setEdges(graph.edges);
       setSelectedNodeId(null);
-      setIssues([]);
+      setServerIssues(null);
+      setGraphVersion((version) => version + 1);
       setExecution(null);
       setRunError(null);
-      setLastChecked(null);
       setDirty(graph.dirty);
+      setDockTab('run');
+      setFitKey((key) => key + 1);
       void loadHistory(graph.id);
     },
     [stopPolling, loadHistory],
@@ -287,12 +314,12 @@ export default function App() {
       return id;
     } catch (error) {
       if (error instanceof ApiError && error.issues.length > 0) {
-        setIssues(toGraphIssues(error.issues));
-        setLastChecked(new Date().toLocaleTimeString());
+        setServerIssues({ version: graphVersion, issues: toGraphIssues(error.issues) });
+        setDockTab('problems');
       }
       throw error;
     }
-  }, [nodes, edges, name, workflowId, loadLibrary, search]);
+  }, [nodes, edges, name, workflowId, loadLibrary, search, graphVersion]);
 
   const onSave = useCallback(async () => {
     setSaving(true);
@@ -359,20 +386,18 @@ export default function App() {
 
   const onValidate = useCallback(async () => {
     setValidating(true);
-    setIssues(validateGraph(nodes, edges));
-    setLastChecked(new Date().toLocaleTimeString());
+    setDockTab('problems');
     try {
       const payload = graphToApi(nodes, edges);
       const result = await api.validateGraph(payload.nodes, payload.edges);
-      // Prefer the server's verdict: it is the authority on what is runnable.
-      setIssues(toGraphIssues(result.issues));
-      setLastChecked(new Date().toLocaleTimeString());
+      // The server is the authority; its verdict stands until the graph changes again.
+      setServerIssues({ version: graphVersion, issues: toGraphIssues(result.issues) });
     } catch {
-      // The client-side result is already displayed; a network failure here is not fatal.
+      // The live in-browser result stays on screen; a network failure here is not fatal.
     } finally {
       setValidating(false);
     }
-  }, [nodes, edges]);
+  }, [nodes, edges, graphVersion]);
 
   // --- execution -------------------------------------------------------------------
 
@@ -417,6 +442,8 @@ export default function App() {
     stopPolling();
     setRunError(null);
     setExecution(null);
+    setSelectedNodeId(null);
+    setDockTab('run');
     setRunning(true);
     try {
       // The backend runs the stored graph, so unsaved edits are saved first.
@@ -461,16 +488,24 @@ export default function App() {
   // Ctrl/Cmd+S saves, as in every editor.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+      if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         if (!saving && nodes.length > 0) {
           void onSave();
+        }
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        if (!running && canRunRef.current) {
+          void onRun();
         }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onSave, saving, nodes.length]);
+  }, [onSave, onRun, saving, running, nodes.length]);
 
   // Auto-dismiss the toast.
   useEffect(() => {
@@ -507,15 +542,25 @@ export default function App() {
     return clash ? `Another node already uses "${keyOf(clash)}".` : null;
   }, [selectedNode, nodes]);
 
-  const blockingIssues = useMemo(() => hasBlockingErrors(issues), [issues]);
+  // The same rules as the server, re-evaluated on every edit.
+  const liveIssues = useMemo(() => (nodes.length > 0 ? validateGraph(nodes, edges) : []), [nodes, edges]);
+  const serverVerdictIsCurrent = serverIssues !== null && serverIssues.version === graphVersion;
+  const issues = serverVerdictIsCurrent ? serverIssues.issues : liveIssues;
+  const errorCount = issues.filter((issue) => issue.severity === 'ERROR').length;
+  const blockingIssues = errorCount > 0;
+  const problemNodeIds = useMemo(
+    () => new Set(issues.filter((i) => i.severity === 'ERROR' && i.nodeId).map((i) => i.nodeId!)),
+    [issues],
+  );
 
-  const canRun = useMemo(() => {
-    if (nodes.length === 0) {
-      return false;
-    }
-    // A run is allowed when the client-side rules pass. The server validates again.
-    return !hasBlockingErrors(validateGraph(nodes, edges));
-  }, [nodes, edges]);
+  // A run is allowed when the client-side rules pass. The server validates again.
+  const canRun = nodes.length > 0 && !hasBlockingErrors(liveIssues);
+  canRunRef.current = canRun;
+
+  const onFocusNode = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setFocus((current) => ({ nodeId, seq: (current?.seq ?? 0) + 1 }));
+  }, []);
 
   return (
     <div className="app">
@@ -538,7 +583,7 @@ export default function App() {
       />
 
       <main className="layout">
-        <div className="layout__left">
+        <aside className="layout__left">
           <WorkflowLibrary
             workflows={workflows}
             examples={examples}
@@ -551,8 +596,8 @@ export default function App() {
             onDelete={(id) => void onDeleteWorkflow(id)}
             onLoadExample={onLoadExample}
           />
-          <NodePalette onAddNode={onAddNode} />
-        </div>
+          <NodePalette onAddNode={(type) => onAddNode(type)} />
+        </aside>
 
         <section className="layout__center">
           <CanvasProvider
@@ -562,11 +607,49 @@ export default function App() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onSelectNode={setSelectedNodeId}
+            selectedNodeId={selectedNodeId}
             execution={execution}
             running={running}
             onDeleteNode={onDeleteNode}
+            problemNodeIds={problemNodeIds}
+            onDropNode={onAddNode}
+            viewCenterRef={viewCenterRef}
+            fitKey={fitKey}
+            focus={focus}
+            examples={examples}
+            onLoadExample={onLoadExample}
           />
-          <ValidationPanel issues={issues} validating={validating} lastChecked={lastChecked} />
+          <Dock
+            tab={dockTab}
+            onTab={setDockTab}
+            problemCount={issues.length}
+            errorCount={errorCount}
+            runStatus={execution?.status ?? null}
+            run={
+              <RunPanel
+                execution={execution}
+                running={running}
+                error={runError}
+                history={history}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={onFocusNode}
+                onOpenRun={(id) => void onOpenRun(id)}
+                onClear={() => {
+                  setExecution(null);
+                  setRunError(null);
+                }}
+              />
+            }
+            problems={
+              <ValidationPanel
+                issues={issues}
+                source={serverVerdictIsCurrent ? 'server' : 'live'}
+                validating={validating}
+                hasNodes={nodes.length > 0}
+                onFocusNode={onFocusNode}
+              />
+            }
+          />
         </section>
 
         <div className="layout__right">
@@ -578,17 +661,6 @@ export default function App() {
             onRename={(label) => selectedNodeId && onRenameNode(selectedNodeId, label)}
             onRenameKey={(key) => selectedNodeId && onRenameKey(selectedNodeId, key)}
             onDelete={() => selectedNodeId && onDeleteNode(selectedNodeId)}
-          />
-          <RunPanel
-            execution={execution}
-            running={running}
-            error={runError}
-            history={history}
-            onOpenRun={(id) => void onOpenRun(id)}
-            onClear={() => {
-              setExecution(null);
-              setRunError(null);
-            }}
           />
         </div>
       </main>

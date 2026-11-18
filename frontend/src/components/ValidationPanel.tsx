@@ -2,63 +2,71 @@ import type { GraphIssue } from '../nodes/graph';
 
 interface ValidationPanelProps {
   issues: GraphIssue[];
+  /** Whether the list came from the server check or from the live in-browser rules. */
+  source: 'live' | 'server';
   validating: boolean;
-  lastChecked: string | null;
+  hasNodes: boolean;
+  onFocusNode: (nodeId: string) => void;
 }
 
 /**
- * The validation panel.
+ * The problems tab of the bottom dock.
  *
- * <p>Errors block the run; warnings do not. Both are shown with the node they belong to,
- * and clicking an issue selects the offending node on the canvas.
+ * <p>It updates as the graph changes, using the same rules the server applies, so the user
+ * never has to ask whether the workflow is runnable. Errors block a run; warnings do not.
+ * An issue that belongs to a node focuses that node on the canvas when clicked.
  */
-export function ValidationPanel({ issues, validating, lastChecked }: ValidationPanelProps) {
+export function ValidationPanel({ issues, source, validating, hasNodes, onFocusNode }: ValidationPanelProps) {
   const errors = issues.filter((issue) => issue.severity === 'ERROR');
-  const warnings = issues.filter((issue) => issue.severity === 'WARNING');
 
   return (
-    <section className="validation" aria-label="Validation" data-testid="validation-panel">
-      <div className="validation__head">
-        <h2 className="panel__title">Validation</h2>
-        {validating ? (
-          <span className="validation__badge validation__badge--busy">Checking…</span>
-        ) : errors.length > 0 ? (
-          <span className="validation__badge validation__badge--error">
-            {errors.length} error{errors.length === 1 ? '' : 's'}
-          </span>
-        ) : warnings.length > 0 ? (
-          <span className="validation__badge validation__badge--warn">
-            {warnings.length} warning{warnings.length === 1 ? '' : 's'}
-          </span>
-        ) : lastChecked ? (
-          <span className="validation__badge validation__badge--ok">Valid</span>
-        ) : null}
-      </div>
+    <section className="problems" aria-label="Problems" data-testid="validation-panel">
+      <p className="problems__summary" role="status">
+        {validating
+          ? 'Checking with the server…'
+          : !hasNodes
+            ? 'Add a node to start building.'
+            : errors.length > 0
+              ? `${errors.length} ${errors.length === 1 ? 'problem blocks' : 'problems block'} this workflow from running.`
+              : issues.length > 0
+                ? 'Ready to run. The notes below will not stop it.'
+                : 'Ready to run. Nothing to fix.'}
+        <span className="problems__source">
+          {source === 'server' ? 'Confirmed by the server' : 'Checked as you edit'}
+        </span>
+      </p>
 
-      {issues.length === 0 && !validating && (
-        <div className="empty-state empty-state--compact">
-          <p className="empty-state__title">
-            {lastChecked ? 'No issues found' : 'Not checked yet'}
-          </p>
-          <p className="empty-state__body">
-            {lastChecked
-              ? 'This workflow is valid and ready to run.'
-              : 'Press Validate to check connections and detect cycles.'}
-          </p>
-        </div>
+      {issues.length > 0 && (
+        <ul className="problems__list">
+          {issues.map((issue, index) => {
+            const body = (
+              <>
+                <span className={`problems__mark problems__mark--${issue.severity.toLowerCase()}`}>
+                  {issue.severity === 'ERROR' ? 'Error' : 'Note'}
+                </span>
+                <span className="problems__message">{issue.message}</span>
+                <code className="problems__code">{issue.code}</code>
+              </>
+            );
+            return (
+              <li key={`${issue.code}-${issue.nodeId ?? issue.edgeId ?? ''}-${index}`}>
+                {issue.nodeId ? (
+                  <button
+                    type="button"
+                    className="problems__item"
+                    onClick={() => onFocusNode(issue.nodeId!)}
+                    title="Show this node"
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div className="problems__item">{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
-
-      <ul className="validation__list">
-        {issues.map((issue, index) => (
-          <li
-            key={`${issue.code}-${index}`}
-            className={`validation__item validation__item--${issue.severity.toLowerCase()}`}
-          >
-            <span className="validation__code">{issue.code}</span>
-            <span className="validation__message">{issue.message}</span>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }

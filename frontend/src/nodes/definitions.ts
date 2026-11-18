@@ -29,29 +29,29 @@ export const NODE_TYPE_DEFINITIONS: Record<NodeType, NodeTypeDefinition> = {
     type: 'TEXT_INPUT',
     title: 'Text Input',
     description: 'A literal piece of text that starts a workflow.',
-    accent: '#38bdf8',
+    accent: '#0E8A7E',
     defaultConfig: { text: 'Type your prompt here…' },
     acceptsInput: false,
     providesOutput: true,
-    hint: 'Emits its text verbatim.',
+    hint: 'Starts a flow with fixed text.',
   },
   PROMPT_TEMPLATE: {
     type: 'PROMPT_TEMPLATE',
     title: 'Prompt Template',
     description: 'Renders a template using upstream values.',
-    accent: '#a78bfa',
+    accent: '#5B4BD8',
     defaultConfig: {
       template: 'Summarise the following:\n{{input}}',
     },
     acceptsInput: true,
     providesOutput: true,
-    hint: 'Use {{input}} or {{nodeKey}} placeholders.',
+    hint: 'Builds a prompt from upstream values.',
   },
   AI_MODEL: {
     type: 'AI_MODEL',
     title: 'AI Model',
     description: 'Sends the prompt to the configured AI provider.',
-    accent: '#f472b6',
+    accent: '#C23B7E',
     defaultConfig: {
       model: 'gpt-4o-mini',
       systemPrompt: 'You are a helpful assistant.',
@@ -59,17 +59,17 @@ export const NODE_TYPE_DEFINITIONS: Record<NodeType, NodeTypeDefinition> = {
     },
     acceptsInput: true,
     providesOutput: true,
-    hint: 'Calls the mock provider by default.',
+    hint: 'Sends one prompt to the model.',
   },
   OUTPUT: {
     type: 'OUTPUT',
     title: 'Output',
     description: 'Collects the final result of the workflow.',
-    accent: '#34d399',
+    accent: '#B7860B',
     defaultConfig: { format: 'text' },
     acceptsInput: true,
     providesOutput: false,
-    hint: 'Terminal node — the workflow result.',
+    hint: 'Collects the final result.',
   },
 };
 
@@ -87,5 +87,5 @@ export function nodeTypeTitle(type: NodeType): string {
 
 /** Accent colour for a node type, with a safe fallback for unknown values. */
 export function nodeTypeAccent(type: NodeType): string {
-  return NODE_TYPE_DEFINITIONS[type]?.accent ?? '#94a3b8';
+  return NODE_TYPE_DEFINITIONS[type]?.accent ?? '#7A8580';
 }

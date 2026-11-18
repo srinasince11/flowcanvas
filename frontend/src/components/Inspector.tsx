@@ -38,12 +38,26 @@ export function Inspector({
   if (!node) {
     return (
       <section className="inspector" aria-label="Node inspector">
-        <h2 className="panel__title">Inspector</h2>
-        <div className="empty-state empty-state--compact">
-          <p className="empty-state__title">No node selected</p>
-          <p className="empty-state__body">
-            Click a node on the canvas to configure it, or add one from the palette.
-          </p>
+        <h2 className="panel__title">Node settings</h2>
+        <div className="inspector__empty">
+          <p className="inspector__empty-title">No node selected</p>
+          <p>Click a node to edit its settings. To connect two nodes, drag from a right-hand socket to a left-hand one.</p>
+          <dl className="shortcuts">
+            <dt>
+              <kbd>Ctrl</kbd>+<kbd>Enter</kbd>
+            </dt>
+            <dd>Run the workflow</dd>
+            <dt>
+              <kbd>Ctrl</kbd>+<kbd>S</kbd>
+            </dt>
+            <dd>Save</dd>
+            <dt>
+              <kbd>Delete</kbd>
+            </dt>
+            <dd>Remove the selected node or link</dd>
+            <dt>Double-click</dt>
+            <dd>Remove a node</dd>
+          </dl>
         </div>
       </section>
     );
@@ -62,10 +76,10 @@ export function Inspector({
 
   return (
     <section className="inspector" aria-label="Node inspector" data-testid="inspector">
-      <h2 className="panel__title">Inspector</h2>
+      <h2 className="panel__title">Node settings</h2>
 
       <div className="inspector__type" style={{ ['--node-accent' as string]: definition?.accent }}>
-        <span className="palette__dot" aria-hidden="true" />
+        <span className="palette__jack" aria-hidden="true" />
         <div>
           <div className="inspector__type-name">{definition?.title ?? type}</div>
           <div className="inspector__type-desc">{definition?.description}</div>
@@ -136,7 +150,7 @@ export function Inspector({
             />
           </label>
           <div className="field__note">
-            <div className="variable-list__title">Available variables · click to insert</div>
+            <div className="variable-list__title">Variables in scope. Click one to insert it.</div>
             <div className="variable-list" data-testid="inspector-variables">
               {variables.map((name) => (
                 <button

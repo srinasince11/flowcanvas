@@ -13,7 +13,7 @@ interface ToolbarProps {
   hasWorkflow: boolean;
 }
 
-/** The top bar: identity, save, validate, run. */
+/** The top bar: the workflow's name, then the actions in order of consequence. */
 export function Toolbar({
   name,
   onRename,
@@ -31,13 +31,13 @@ export function Toolbar({
   return (
     <header className="toolbar">
       <div className="toolbar__brand">
-        <span className="toolbar__logo" aria-hidden="true">
-          ◈
-        </span>
-        <div className="toolbar__titles">
-          <span className="toolbar__product">FlowCanvas</span>
-          <span className="toolbar__tagline">Visual AI workflow builder</span>
-        </div>
+        <svg className="toolbar__logo" viewBox="0 0 28 28" aria-hidden="true">
+          <circle cx="6" cy="8" r="3.2" />
+          <circle cx="6" cy="20" r="3.2" />
+          <circle cx="22" cy="14" r="3.2" />
+          <path d="M9 8c6 0 6 6 10 6M9 20c6 0 6-6 10-6" />
+        </svg>
+        <span className="toolbar__product">FlowCanvas</span>
       </div>
 
       <div className="toolbar__name">
@@ -48,53 +48,57 @@ export function Toolbar({
           placeholder="Untitled workflow"
           aria-label="Workflow name"
           data-testid="workflow-name"
+          spellCheck={false}
         />
-        {dirty && (
-          <span className="toolbar__dirty" title="There are unsaved changes">
-            ●
-          </span>
-        )}
+        <span className="toolbar__state" aria-live="polite">
+          {saving ? 'Saving…' : dirty ? 'Unsaved changes' : hasWorkflow ? 'Saved' : ''}
+        </span>
       </div>
 
       <div className="toolbar__actions">
-        <button type="button" className="button button--ghost" onClick={onNew} data-testid="new-workflow">
+        <button type="button" className="button button--quiet" onClick={onNew} data-testid="new-workflow">
           New
         </button>
         <button
           type="button"
-          className="button button--ghost"
+          className="button button--quiet"
           onClick={onClear}
           disabled={!hasWorkflow}
           data-testid="clear-graph"
         >
-          Clear canvas
+          Clear
         </button>
+        <span className="toolbar__divider" aria-hidden="true" />
         <button
           type="button"
-          className="button button--ghost"
+          className="button"
           onClick={onValidate}
           disabled={!hasWorkflow}
+          title="Check the workflow with the server"
           data-testid="validate-workflow"
         >
-          Validate
+          Check
         </button>
         <button
           type="button"
-          className="button button--secondary"
+          className="button"
           onClick={onSave}
           disabled={saving || !dirty}
+          title="Save (Ctrl+S)"
           data-testid="save-workflow"
         >
-          {saving ? 'Saving…' : 'Save'}
+          Save
         </button>
         <button
           type="button"
-          className="button button--primary"
+          className={`button button--run${running ? ' is-running' : ''}`}
           onClick={onRun}
           disabled={running || !canRun}
+          title={canRun ? 'Run (Ctrl+Enter)' : 'Fix the problems listed below to run'}
           data-testid="run-workflow"
         >
-          {running ? 'Running…' : '▶ Run'}
+          <span className="button__led" aria-hidden="true" />
+          {running ? 'Running' : 'Run'}
         </button>
       </div>
     </header>
