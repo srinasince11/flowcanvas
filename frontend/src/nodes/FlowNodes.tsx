@@ -4,10 +4,10 @@ import type { NodeExecutionStatus, NodeType } from '../types';
 import { nodeTypeAccent, nodeTypeTitle } from './definitions';
 
 /**
- * The shared visual shell for every node type.
+ * The shared shell for every node type.
  *
- * <p>All four node types render through this component so that handles, selection styling
- * and the execution-state badge behave identically everywhere. Only the body differs.
+ * <p>All four node types render through this component, so sockets, selection and the
+ * run-state light behave identically everywhere. Only the summary line differs.
  */
 export interface FlowNodeData {
   /** The name templates use to reference this node's output, e.g. `{{advocate}}`. */
@@ -15,95 +15,86 @@ export interface FlowNodeData {
   label: string;
   config: Record<string, unknown>;
   nodeType: NodeType;
-  /** The live execution status, present only while a run is in progress. */
+  /** The live execution status, present only once a run has touched the node. */
   executionStatus?: NodeExecutionStatus;
-  /** The output of the last run, shown as a preview. */
   output?: string;
-  /** The error of the last run. */
   error?: string;
-  /** The measured duration of the last run, in milliseconds. */
   durationMs?: number;
   /** True when the node is part of a detected cycle. */
   inCycle?: boolean;
+  /** True when a blocking validation problem belongs to this node. */
+  hasProblem?: boolean;
 }
 
-function statusGlyph(status?: NodeExecutionStatus): string {
-  switch (status) {
-    case 'RUNNING':
-      return '●';
-    case 'SUCCESS':
-      return '✓';
-    case 'FAILED':
-      return '✕';
-    case 'SKIPPED':
-      return '–';
-    case 'PENDING':
-      return '○';
-    default:
-      return '';
-  }
-}
+const STATUS_TEXT: Record<NodeExecutionStatus, string> = {
+  PENDING: 'Waiting',
+  RUNNING: 'Running',
+  SUCCESS: 'Done',
+  FAILED: 'Failed',
+  SKIPPED: 'Skipped',
+};
 
 function summarise(config: Record<string, unknown>, type: NodeType): string {
   if (type === 'TEXT_INPUT') {
-    return String(config.text ?? '').slice(0, 60);
+    return String(config.text ?? '');
   }
   if (type === 'PROMPT_TEMPLATE') {
-    return String(config.template ?? '').replace(/\s+/g, ' ').slice(0, 60);
+    return String(config.template ?? '');
   }
   if (type === 'AI_MODEL') {
-    return `${String(config.model ?? 'default')} · T=${Number(config.temperature ?? 0.7).toFixed(2)}`;
+    return `${String(config.model ?? 'default model')}, temperature ${Number(config.temperature ?? 0.7).toFixed(1)}`;
   }
-  return `format: ${String(config.format ?? 'text')}`;
+  return String(config.format ?? 'text') === 'json' ? 'Collects inputs as JSON' : 'Collects inputs as text';
 }
 
 function FlowNodeShell({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as FlowNodeData;
   const type = nodeData.nodeType;
-  const accent = nodeTypeAccent(type);
   const status = nodeData.executionStatus;
-  const stateClass = status ? ` is-${status.toLowerCase()}` : '';
-  const cycleClass = nodeData.inCycle ? ' is-cycle' : '';
+  const classes = [
+    'flow-node',
+    status ? `is-${status.toLowerCase()}` : '',
+    nodeData.inCycle ? 'is-cycle' : '',
+    nodeData.hasProblem ? 'has-problem' : '',
+    selected ? 'is-selected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div
-      className={`flow-node${stateClass}${cycleClass}${selected ? ' is-selected' : ''}`}
-      style={{ ['--node-accent' as string]: accent }}
+      className={classes}
+      style={{ ['--node-accent' as string]: nodeTypeAccent(type) }}
       data-testid={`node-${id}`}
       data-status={status ?? 'idle'}
     >
       {type !== 'TEXT_INPUT' && (
-        <Handle type="target" position={Position.Left} id="in" className="flow-handle" />
+        <Handle type="target" position={Position.Left} id="in" className="socket socket--in" />
       )}
 
       <header className="flow-node__header">
-        <span className="flow-node__dot" />
-        <span className="flow-node__title">{nodeTypeTitle(type)}</span>
-        {status && (
-          <span className={`flow-node__status flow-node__status--${status.toLowerCase()}`}>
-            {statusGlyph(status)}
-          </span>
-        )}
-      </header>
-
-      <div className="flow-node__label-row">
-        <span className="flow-node__label">{nodeData.label}</span>
-        <code className="flow-node__key" title="Reference this node in a template as {{key}}">
+        <span className="flow-node__type">{nodeTypeTitle(type)}</span>
+        <code className="flow-node__key" title="Reference this node in a template by this key">
           {nodeData.key ?? id}
         </code>
-      </div>
-      <div className="flow-node__preview">{summarise(nodeData.config, type)}</div>
+      </header>
 
-      {nodeData.error && <div className="flow-node__error">{nodeData.error}</div>}
-      {!nodeData.error && nodeData.output && (
-        <div className="flow-node__output">{nodeData.output.slice(0, 80)}</div>
+      <div className="flow-node__label">{nodeData.label}</div>
+      <div className="flow-node__summary">{summarise(nodeData.config, type)}</div>
+
+      {status && (
+        <footer className="flow-node__status">
+          <span className={`led led--${status.toLowerCase()}`} aria-hidden="true" />
+          <span>{STATUS_TEXT[status]}</span>
+          {(status === 'SUCCESS' || status === 'FAILED') && nodeData.durationMs !== undefined && (
+            <span className="flow-node__duration">{nodeData.durationMs} ms</span>
+          )}
+        </footer>
       )}
-      {nodeData.durationMs !== undefined && nodeData.durationMs > 0 && (
-        <div className="flow-node__duration">{nodeData.durationMs} ms</div>
-      )}
+      {status === 'FAILED' && nodeData.error && <div className="flow-node__error">{nodeData.error}</div>}
 
       {type !== 'OUTPUT' && (
-        <Handle type="source" position={Position.Right} id="out" className="flow-handle" />
+        <Handle type="source" position={Position.Right} id="out" className="socket socket--out" />
       )}
     </div>
   );

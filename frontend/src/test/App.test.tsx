@@ -413,4 +413,24 @@ describe('App', () => {
       expect(screen.getByText('first run output', { selector: 'pre' })).toBeInTheDocument(),
     );
   });
+
+  it('lists problems live as the graph changes, and clicking one selects its node', async () => {
+    const user = userEvent.setup();
+    installFetchMock();
+
+    render(<App />);
+
+    // A lone Output node is missing its input: a blocking problem, shown without any button press.
+    await user.click(screen.getByTestId('add-node-OUTPUT'));
+    await user.click(screen.getByRole('tab', { name: /Problems/ }));
+    const panel = screen.getByTestId('validation-panel');
+    expect(panel).toHaveTextContent('1 problem blocks this workflow from running.');
+    expect(screen.getByTestId('run-workflow')).toBeDisabled();
+
+    // Select something else, then use the problem to get back to the node.
+    await user.click(screen.getByTestId('add-node-TEXT_INPUT'));
+    await user.click(within(panel).getByRole('button', { name: /needs an incoming connection/ }));
+
+    await waitFor(() => expect(screen.getByTestId('inspector-key')).toHaveValue('output1'));
+  });
 });

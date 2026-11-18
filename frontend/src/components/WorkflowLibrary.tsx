@@ -33,12 +33,12 @@ export function WorkflowLibrary({
 }: WorkflowLibraryProps) {
   return (
     <aside className="library" aria-label="Workflow library">
-      <h2 className="panel__title">Workflows</h2>
+      <h2 className="panel__title">Saved workflows</h2>
 
       <input
         className="field__input library__search"
         type="search"
-        placeholder="Search workflows…"
+        placeholder="Search by name or description"
         value={search}
         onChange={(event) => onSearch(event.target.value)}
         aria-label="Search workflows"
@@ -67,7 +67,7 @@ export function WorkflowLibrary({
           <p className="empty-state__body">
             {search
               ? `Nothing matches “${search}”. Try a different search.`
-              : 'Save the workflow you are working on, or start from an example below.'}
+              : 'Save the canvas to keep it here, or open an example below.'}
           </p>
         </div>
       )}
@@ -88,8 +88,8 @@ export function WorkflowLibrary({
               >
                 <span className="library__name">{workflow.name}</span>
                 <span className="library__meta">
-                  {workflow.nodeCount} node{workflow.nodeCount === 1 ? '' : 's'} ·{' '}
-                  {workflow.edgeCount} connection{workflow.edgeCount === 1 ? '' : 's'}
+                  {workflow.nodeCount} node{workflow.nodeCount === 1 ? '' : 's'},{' '}
+                  {workflow.edgeCount} link{workflow.edgeCount === 1 ? '' : 's'}
                 </span>
               </button>
               <button
@@ -106,7 +106,7 @@ export function WorkflowLibrary({
         ))}
       </ul>
 
-      <h2 className="panel__title panel__title--spaced">Examples</h2>
+      <h2 className="panel__title panel__title--spaced">Start from an example</h2>
       <ul className="library__list">
         {examples.map((example) => (
           <li key={example.name}>

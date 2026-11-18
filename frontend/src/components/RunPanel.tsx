@@ -1,5 +1,8 @@
-import type { ApiExecution, ApiExecutionSummary } from '../types';
+import { useState } from 'react';
+import type { ApiExecution, ApiExecutionSummary, ApiNodeExecution } from '../types';
 import { nodeTypeTitle } from '../nodes/definitions';
+import { RunTrace } from './RunTrace';
+import { formatDuration } from '../format';
 
 interface RunPanelProps {
   execution: ApiExecution | null;
@@ -7,25 +10,34 @@ interface RunPanelProps {
   error: string | null;
   /** Recent runs of the current workflow, newest first. */
   history: ApiExecutionSummary[];
+  selectedNodeId: string | null;
+  onSelectNode: (nodeId: string) => void;
   onOpenRun: (executionId: string) => void;
   onClear: () => void;
 }
 
+const STATUS_TEXT: Record<string, string> = {
+  PENDING: 'Queued',
+  RUNNING: 'Running',
+  SUCCESS: 'Succeeded',
+  FAILED: 'Failed',
+  CANCELLED: 'Cancelled',
+};
+
+/** Time of day for today's runs; the date as well for older ones. */
 function formatTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     return iso;
   }
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  if (date.toDateString() === new Date().toDateString()) {
+    return time;
+  }
+  return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
-/** The recent runs of the workflow; selecting one replays its results on the canvas. */
+/** The recent runs of the workflow; selecting one replays it in the trace. */
 function RunHistory({
   history,
   activeId,
@@ -51,12 +63,9 @@ function RunHistory({
                 className={`history__item${active ? ' is-active' : ''}`}
                 onClick={() => onOpenRun(run.id)}
                 aria-current={active ? 'true' : undefined}
-                title={run.error ?? run.status}
+                title={run.error ?? STATUS_TEXT[run.status] ?? run.status}
               >
-                <span
-                  className={`history__dot history__dot--${run.status.toLowerCase()}`}
-                  aria-hidden="true"
-                />
+                <span className={`led led--${run.status.toLowerCase()}`} aria-hidden="true" />
                 <span className="history__time">{formatTime(run.startedAt)}</span>
                 <span className="sr-only">{run.status}</span>
                 {run.durationMs !== undefined && run.durationMs !== null && (
@@ -72,99 +81,141 @@ function RunHistory({
 }
 
 /**
- * The run results panel.
- *
- * <p>Shows the ordered list of node executions with their status, output, error and
- * duration — the evidence that the workflow actually ran in dependency order. While a run
- * is in flight the whole plan is listed, so pending nodes are visible before they start.
+ * Which node's result to show when the user has not picked one: the workflow's answer
+ * (the last Output that succeeded), otherwise whatever went wrong, otherwise the newest
+ * result.
  */
-export function RunPanel({ execution, running, error, history, onOpenRun, onClear }: RunPanelProps) {
-  if (!execution && !running && !error) {
-    return (
-      <section className="run-panel" aria-label="Run results" data-testid="run-panel">
-        <h2 className="panel__title">Run results</h2>
-        <div className="empty-state empty-state--compact">
-          <p className="empty-state__title">No run yet</p>
-          <p className="empty-state__body">
-            Press <strong>Run</strong> to execute the workflow and see per-node results here.
-          </p>
-        </div>
-        <RunHistory history={history} activeId={undefined} onOpenRun={onOpenRun} />
-      </section>
-    );
-  }
+function defaultDetail(nodes: ApiNodeExecution[]): ApiNodeExecution | undefined {
+  const reversed = [...nodes].reverse();
+  return (
+    reversed.find((n) => n.type === 'OUTPUT' && n.status === 'SUCCESS') ??
+    reversed.find((n) => n.status === 'FAILED') ??
+    reversed.find((n) => n.status === 'RUNNING') ??
+    reversed.find((n) => n.status === 'SUCCESS')
+  );
+}
 
-  const nodeExecutions = execution?.nodeExecutions ?? [];
-  const done = nodeExecutions.filter((n) => n.status !== 'PENDING' && n.status !== 'RUNNING').length;
+function NodeResult({ node }: { node: ApiNodeExecution }) {
+  const [copied, setCopied] = useState(false);
+  const text = node.output ?? node.error ?? '';
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="result" data-testid="run-result">
+      <div className="result__head">
+        <span className={`led led--${node.status.toLowerCase()}`} aria-hidden="true" />
+        <span className="result__label">{node.label}</span>
+        <span className="result__type">{nodeTypeTitle(node.type)}</span>
+        {text.length > 0 && (
+          <button type="button" className="button button--quiet result__copy" onClick={() => void copy()}>
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        )}
+      </div>
+      {node.error && <pre className="result__body result__body--error">{node.error}</pre>}
+      {node.output && <pre className="result__body">{node.output}</pre>}
+      {!node.output && !node.error && (
+        <p className="result__empty">
+          {node.status === 'RUNNING'
+            ? 'Running now.'
+            : node.status === 'PENDING'
+              ? 'Waiting for its inputs.'
+              : 'This node produced no text.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The run tab of the bottom dock: recent runs, the execution trace, and the output of the
+ * node picked in the trace (by default, the workflow's final result).
+ */
+export function RunPanel({
+  execution,
+  running,
+  error,
+  history,
+  selectedNodeId,
+  onSelectNode,
+  onOpenRun,
+  onClear,
+}: RunPanelProps) {
+  const nodes = execution?.nodeExecutions ?? [];
+  const detail = nodes.find((n) => n.nodeId === selectedNodeId) ?? defaultDetail(nodes);
+  const done = nodes.filter((n) => n.status !== 'PENDING' && n.status !== 'RUNNING').length;
 
   return (
     <section className="run-panel" aria-label="Run results" data-testid="run-panel">
-      <div className="run-panel__head">
-        <h2 className="panel__title">Run results</h2>
+      <RunHistory history={history} activeId={execution?.id} onOpenRun={onOpenRun} />
+
+      <div className="run-panel__main">
+        {error && (
+          <div className="alert alert--error" role="alert">
+            {error}
+          </div>
+        )}
+
+        {!execution && !error && (
+          <div className="run-panel__empty">
+            {running ? (
+              <p role="status">Starting the run…</p>
+            ) : (
+              <>
+                <p className="run-panel__empty-title">No run yet</p>
+                <p>
+                  Press <strong>Run</strong> or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>. Each node appears here
+                  as a bar on a shared timeline, so you can see what ran when and how long it took.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         {execution && (
-          <span className={`run-panel__status run-panel__status--${execution.status.toLowerCase()}`}>
-            {execution.status}
-            {execution.status === 'RUNNING' && nodeExecutions.length > 0
-              ? ` · ${done}/${nodeExecutions.length}`
-              : ''}
-            {execution.durationMs !== undefined && execution.durationMs !== null
-              ? ` · ${execution.durationMs} ms`
-              : ''}
-          </span>
+          <>
+            <div className="run-panel__head">
+              <span className={`led led--${execution.status.toLowerCase()}`} aria-hidden="true" />
+              <span className="run-panel__status" role="status">
+                {STATUS_TEXT[execution.status] ?? execution.status}
+                {execution.status === 'RUNNING' && nodes.length > 0 && `, ${done} of ${nodes.length} nodes`}
+              </span>
+              {execution.durationMs !== undefined && execution.durationMs !== null && (
+                <span className="run-panel__total">{formatDuration(execution.durationMs)} total</span>
+              )}
+              {!running && (
+                <button type="button" className="button button--quiet" onClick={onClear}>
+                  Clear results
+                </button>
+              )}
+            </div>
+
+            {nodes.length === 0 ? (
+              <p className="run-panel__note">
+                {execution.error ?? 'The run stopped before any node started.'}
+              </p>
+            ) : (
+              <div className="run-panel__body">
+                <RunTrace
+                  execution={execution}
+                  selectedNodeId={detail?.nodeId ?? null}
+                  onSelect={onSelectNode}
+                />
+                {detail && <NodeResult node={detail} />}
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {error && (
-        <div className="alert alert--error" role="alert">
-          {error}
-        </div>
-      )}
-
-      {running && nodeExecutions.length === 0 && (
-        <div className="alert alert--info" role="status">
-          Executing workflow…
-        </div>
-      )}
-
-      {execution && nodeExecutions.length === 0 && execution.status !== 'RUNNING' && (
-        <div className="empty-state empty-state--compact">
-          <p className="empty-state__title">The run produced no node results</p>
-          <p className="empty-state__body">{execution.error ?? 'Check the validation issues for details.'}</p>
-        </div>
-      )}
-
-      <ol className="run-list">
-        {nodeExecutions.map((nodeExecution) => (
-          <li key={nodeExecution.nodeId} className={`run-item run-item--${nodeExecution.status.toLowerCase()}`}>
-            <div className="run-item__head">
-              <span className="run-item__sequence">#{nodeExecution.sequence}</span>
-              <span className="run-item__label">{nodeExecution.label}</span>
-              <span className="run-item__type">{nodeTypeTitle(nodeExecution.type)}</span>
-              <span className={`run-item__status run-item__status--${nodeExecution.status.toLowerCase()}`}>
-                {nodeExecution.status}
-              </span>
-              {nodeExecution.durationMs !== undefined &&
-                nodeExecution.durationMs !== null &&
-                nodeExecution.status !== 'PENDING' &&
-                nodeExecution.status !== 'RUNNING' && (
-                  <span className="run-item__duration">{nodeExecution.durationMs} ms</span>
-                )}
-            </div>
-            {nodeExecution.error && <pre className="run-item__error">{nodeExecution.error}</pre>}
-            {nodeExecution.output && nodeExecution.output.length > 0 && (
-              <pre className="run-item__output">{nodeExecution.output}</pre>
-            )}
-          </li>
-        ))}
-      </ol>
-
-      {execution && !running && (
-        <button type="button" className="button button--ghost" onClick={onClear}>
-          Clear results
-        </button>
-      )}
-
-      <RunHistory history={history} activeId={execution?.id} onOpenRun={onOpenRun} />
     </section>
   );
 }
