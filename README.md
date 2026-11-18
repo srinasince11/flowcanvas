@@ -6,7 +6,7 @@
 
 **React Flow** · **Spring Boot** · **PostgreSQL** · **Docker**
 
-[![Backend tests](https://img.shields.io/badge/backend-77%20tests%20passing-22c55e?style=flat-square)](backend/src/test)
+[![Backend tests](https://img.shields.io/badge/backend-79%20tests%20passing-22c55e?style=flat-square)](backend/src/test)
 [![Frontend tests](https://img.shields.io/badge/frontend-56%20tests%20passing-22c55e?style=flat-square)](frontend/src/test)
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk&logoColor=white)](backend/pom.xml)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -66,7 +66,7 @@ is one environment variable away.
 | **Pluggable, resilient AI** | An `AiProvider` interface with a deterministic offline mock (default) and an OpenAI-compatible provider with request timeouts and retries with exponential backoff on `429`/`5xx`/network errors (honouring `Retry-After`), but none on `4xx`. |
 | **Crash-safe runs** | A run always terminates: unexpected failures mark it `FAILED`, and runs orphaned by a restart are closed at startup instead of spinning forever. |
 | **No secrets in the repo** | Credentials come from the environment. `.env` is git-ignored; `.env.example` documents every variable. |
-| **Real tests** | 77 backend tests (integration tests against a real embedded PostgreSQL, and the AI client against a real local HTTP server) and 56 frontend tests. |
+| **Real tests** | 79 backend tests (integration tests against a real embedded PostgreSQL, and the AI client against a real local HTTP server) and 56 frontend tests. |
 | **One-command setup** | `docker compose up --build` starts the database, the API and the frontend. CI runs the whole suite on every push. |
 
 ---
@@ -288,7 +288,7 @@ flowcanvas/
 │   │   ├── repository/   Spring Data repositories
 │   │   └── service/      WorkflowService · ExecutionService · ExecutionRunner · examples
 │   ├── src/main/resources/db/migration/V1__init_schema.sql
-│   └── src/test/java/…   77 tests
+│   └── src/test/java/…   79 tests
 │
 ├── frontend/
 │   ├── src/
@@ -453,7 +453,7 @@ Full schema, constraints and indexes: **[docs/database-schema.md](docs/database-
 ## Testing
 
 ```bash
-cd backend  && mvn test        # 77 tests
+cd backend  && mvn test        # 79 tests
 cd frontend && npm run test     # 56 tests
 ```
 
