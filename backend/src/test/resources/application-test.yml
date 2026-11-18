@@ -1,0 +1,26 @@
+# Test profile: uses the embedded PostgreSQL started by the test harness.
+# Flyway still runs the production migrations, so the schema under test is the real schema.
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+flowcanvas:
+  seed:
+    examples: false
+  ai:
+    provider: mock
+    mock-latency-ms: 0
+
+logging:
+  level:
+    root: WARN
+    com.flowcanvas: INFO
+    org.flywaydb: INFO
+    org.springframework.test: WARN

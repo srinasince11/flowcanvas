@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="860" viewBox="0 0 1440 860" font-family="Inter, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+    <marker id="a2ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981"/>
+    </marker>
+    <marker id="a2bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"/>
+    </marker>
+        <filter id="s2" x="-20%" y="-20%" width="140%" height="140%">
+      <!-- Classic filter chain instead of feDropShadow: feDropShadow is an SVG 2
+           primitive that several renderers (including librsvg, used to produce the
+           PNG) silently drop, taking every filtered element with it. -->
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+      <feOffset in="blur" dx="0" dy="2" result="offsetBlur"/>
+      <feComponentTransfer in="offsetBlur" result="shadow">
+        <feFuncA type="linear" slope="0.10"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="860" fill="#f8fafc"/>
+  <text x="48" y="54" font-size="26" font-weight="700" fill="#0f172a">Execution Pipeline</text>
+  <text x="48" y="80" font-size="14" fill="#64748b">How a workflow becomes a result — validation, deterministic ordering, and failure isolation</text>
+
+  <!-- ============ Stage 1: validate ============ -->
+  <g filter="url(#s2)">
+    <rect x="48" y="110" width="240" height="140" rx="12" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+    <rect x="48" y="110" width="240" height="5" rx="2.5" fill="#6366f1"/>
+    <text x="70" y="146" font-size="12" font-weight="700" fill="#6366f1" letter-spacing="1">STEP 1</text>
+    <text x="70" y="172" font-size="16" font-weight="650" fill="#0f172a">Validate</text>
+    <text x="70" y="196" font-size="12" fill="#64748b">Arity rules per node type</text>
+    <text x="70" y="214" font-size="12" fill="#64748b">Dangling · duplicate · self-loop</text>
+    <text x="70" y="232" font-size="12" fill="#64748b">Cycle detection (DFS, 3-colour)</text>
+  </g>
+
+  <!-- decision diamond -->
+  <g filter="url(#s2)">
+    <path d="M 400 122 L 470 180 L 400 238 L 330 180 Z" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+    <text x="400" y="176" font-size="13" font-weight="650" fill="#0f172a" text-anchor="middle">Any</text>
+    <text x="400" y="194" font-size="13" font-weight="650" fill="#0f172a" text-anchor="middle">errors?</text>
+  </g>
+
+  <!-- fail path -->
+  <g filter="url(#s2)">
+    <rect x="48" y="300" width="240" height="110" rx="12" fill="#fef2f2" stroke="#ef4444" stroke-width="1.6"/>
+    <text x="70" y="334" font-size="16" font-weight="650" fill="#b91c1c">Refuse to run</text>
+    <text x="70" y="358" font-size="12" fill="#7f1d1d">Run → FAILED</text>
+    <text x="70" y="376" font-size="12" fill="#7f1d1d">Issues returned to the UI</text>
+    <text x="70" y="394" font-size="12" fill="#7f1d1d">Root cause ordered first</text>
+  </g>
+  <path d="M 400 238 L 400 268 L 168 268 L 168 292" stroke="#ef4444" stroke-width="2" fill="none" marker-end="url(#a2bad)"/>
+  <text x="410" y="264" font-size="11.5" fill="#dc2626">yes</text>
+
+  <!-- ============ Stage 2: order ============ -->
+  <g filter="url(#s2)">
+    <rect x="520" y="110" width="300" height="140" rx="12" fill="#ffffff" stroke="#8b5cf6" stroke-width="1.6"/>
+    <rect x="520" y="110" width="300" height="5" rx="2.5" fill="#8b5cf6"/>
+    <text x="542" y="146" font-size="12" font-weight="700" fill="#8b5cf6" letter-spacing="1">STEP 2</text>
+    <text x="542" y="172" font-size="16" font-weight="650" fill="#0f172a">Topological sort</text>
+    <text x="542" y="196" font-size="12" fill="#64748b">Kahn's algorithm</text>
+    <text x="542" y="214" font-size="12" fill="#64748b">Ties broken by node key →</text>
+    <text x="542" y="232" font-size="12" fill="#64748b">always the same order</text>
+  </g>
+  <path d="M 470 180 L 514 180" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+  <text x="492" y="170" font-size="11.5" fill="#64748b">no</text>
+
+  <!-- ============ Stage 3: execute ============ -->
+  <g filter="url(#s2)">
+    <rect x="870" y="110" width="300" height="140" rx="12" fill="#ffffff" stroke="#10b981" stroke-width="1.6"/>
+    <rect x="870" y="110" width="300" height="5" rx="2.5" fill="#10b981"/>
+    <text x="892" y="146" font-size="12" font-weight="700" fill="#10b981" letter-spacing="1">STEP 3</text>
+    <text x="892" y="172" font-size="16" font-weight="650" fill="#0f172a">Execute in order</text>
+    <text x="892" y="196" font-size="12" fill="#64748b">Each node receives its</text>
+    <text x="892" y="214" font-size="12" fill="#64748b">predecessors' outputs</text>
+    <text x="892" y="232" font-size="12" fill="#64748b">+ all ancestors (variables)</text>
+  </g>
+  <path d="M 820 180 L 864 180" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+
+  <!-- node executors -->
+  <g filter="url(#s2)">
+    <rect x="1220" y="80" width="172" height="200" rx="12" fill="#ecfdf5" stroke="#34d399" stroke-width="1.6"/>
+    <text x="1238" y="108" font-size="12" font-weight="700" fill="#047857" letter-spacing="0.8">NODE EXECUTORS</text>
+    <text x="1238" y="134" font-size="12" fill="#065f46">TextInputExecutor</text>
+    <text x="1238" y="158" font-size="12" fill="#065f46">PromptTemplateExecutor</text>
+    <text x="1238" y="182" font-size="12" fill="#065f46">AiModelExecutor</text>
+    <text x="1238" y="206" font-size="12" fill="#065f46">OutputExecutor</text>
+    <text x="1238" y="238" font-size="11" fill="#059669">→ AiProvider SPI</text>
+    <text x="1238" y="260" font-size="11" fill="#059669">mock | openai</text>
+  </g>
+  <path d="M 1170 180 L 1214 180" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#a2ok)"/>
+
+  <!-- ============ per-node loop ============ -->
+  <path d="M 1020 250 L 1020 296" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+  <g filter="url(#s2)">
+    <rect x="520" y="296" width="872" height="176" rx="12" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4"/>
+    <text x="542" y="324" font-size="13" font-weight="700" fill="#334155">FOR EACH NODE IN TOPOLOGICAL ORDER</text>
+
+    <rect x="542" y="340" width="248" height="112" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+    <text x="560" y="366" font-size="13" font-weight="650" fill="#0f172a">Ancestors already failed?</text>
+    <text x="560" y="390" font-size="11.5" fill="#64748b">Explicit-stack walk of the</text>
+    <text x="560" y="408" font-size="11.5" fill="#64748b">incoming edges — no recursion,</text>
+    <text x="560" y="426" font-size="11.5" fill="#64748b">so a deep graph is safe</text>
+
+    <rect x="806" y="340" width="230" height="112" rx="10" fill="#f0fdf4" stroke="#34d399" stroke-width="1.2"/>
+    <text x="824" y="366" font-size="13" font-weight="650" fill="#0f172a">Yes → SKIPPED</text>
+    <text x="824" y="390" font-size="11.5" fill="#166534">The node is not attempted.</text>
+    <text x="824" y="408" font-size="11.5" fill="#166534">Its result would have been</text>
+    <text x="824" y="426" font-size="11.5" fill="#166534">incomplete anyway.</text>
+
+    <rect x="1052" y="340" width="318" height="112" rx="10" fill="#f0fdf4" stroke="#34d399" stroke-width="1.2"/>
+    <text x="1070" y="366" font-size="13" font-weight="650" fill="#0f172a">No → run the executor</text>
+    <text x="1070" y="390" font-size="11.5" fill="#166534">Measure duration (System.nanoTime)</text>
+    <text x="1070" y="408" font-size="11.5" fill="#166534">Record output, or the error</text>
+    <text x="1070" y="426" font-size="11.5" fill="#166534">Continue to the next node</text>
+
+    <path d="M 790 396 L 800 396" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+    <path d="M 1036 396 L 1046 396" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+  </g>
+
+  <!-- failure isolation callout -->
+  <g filter="url(#s2)">
+    <rect x="48" y="510" width="1344" height="104" rx="12" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="70" y="542" font-size="15" font-weight="650" fill="#b91c1c">Failure isolation — the property worth defending</text>
+    <text x="70" y="568" font-size="12.5" fill="#7f1d1d">A failed node marks its descendants SKIPPED, but independent branches keep running.</text>
+    <text x="70" y="590" font-size="12.5" fill="#7f1d1d">One failed AI call costs you that branch — not the whole workflow. The run still reports per-node status, output, error and duration for every node.</text>
+  </g>
+
+  <!-- ============ results ============ -->
+  <g filter="url(#s2)">
+    <rect x="48" y="646" width="1344" height="126" rx="12" fill="#ffffff" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="70" y="678" font-size="15" font-weight="650" fill="#0f172a">Persisted results — every run is inspectable afterwards</text>
+    <rect x="70" y="694" width="300" height="60" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="86" y="718" font-size="12.5" font-weight="650" fill="#0f172a">workflow_executions</text>
+    <text x="86" y="738" font-size="11" fill="#64748b">status · duration_ms · error</text>
+    <rect x="390" y="694" width="300" height="60" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="406" y="718" font-size="12.5" font-weight="650" fill="#0f172a">node_executions</text>
+    <text x="406" y="738" font-size="11" fill="#64748b">sequence · status · output · duration</text>
+    <rect x="710" y="694" width="300" height="60" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="726" y="718" font-size="12.5" font-weight="650" fill="#0f172a">GET /api/v1/executions/{id}</text>
+    <text x="726" y="738" font-size="11" fill="#64748b">polled while the run is live</text>
+    <rect x="1030" y="694" width="342" height="60" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="1046" y="718" font-size="12.5" font-weight="650" fill="#0f172a">sequence column</text>
+    <text x="1046" y="738" font-size="11" fill="#64748b">makes the ordering directly observable</text>
+  </g>
+
+  <text x="48" y="820" font-size="12" fill="#64748b">The engine is a pure function of the graph: same graph in, same ordered results out — which is why the ordering can be asserted in tests and shown in the UI.</text>
+  <text x="48" y="842" font-size="12" fill="#94a3b8">Implementation: backend/src/main/java/com/flowcanvas/engine/WorkflowEngine.java · backend/src/main/java/com/flowcanvas/graph/GraphValidator.java</text>
+</svg>
