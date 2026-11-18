@@ -1,0 +1,7 @@
+# Normalise line endings: LF in the repository and in every checkout, so shell scripts,
+# Dockerfiles and YAML behave the same on Windows, macOS, Linux and in containers.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jar binary

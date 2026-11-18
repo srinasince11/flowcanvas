@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# FlowCanvas — full local stack.
+#
+#   cp .env.example .env
+#   docker compose up --build
+#
+# Then open http://localhost:5173
+#
+# The database is exposed on port 5432 so you can inspect it with psql or a GUI
+# client. Everything else is internal to the compose network.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: flowcanvas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-flowcanvas}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      - flowcanvas-db-data:/var/lib/postgresql/data
+    healthcheck:
+      # The backend waits for this, so it never races the database at startup.
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-flowcanvas}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flowcanvas-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-flowcanvas}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
+      AI_MAX_RETRIES: ${AI_MAX_RETRIES:-2}
+      AI_MOCK_LATENCY_MS: ${AI_MOCK_LATENCY_MS:-600}
+      SEED_EXAMPLES: ${SEED_EXAMPLES:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - '${BACKEND_PORT:-8080}:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:8080/actuator/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    container_name: flowcanvas-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - '${FRONTEND_PORT:-5173}:80'
+
+volumes:
+  flowcanvas-db-data:
+    name: flowcanvas-db-data

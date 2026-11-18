@@ -1,0 +1,40 @@
+# ── Secrets & local configuration ────────────────────────────────────────────
+# .env holds real credentials. It is never committed.
+.env
+.env.*
+!.env.example
+
+# ── Java / Maven ─────────────────────────────────────────────────────────────
+target/
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/tomcat-repo/
+
+# ── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.local
+.vite/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Editors & OS ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.iml
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ── TypeScript incremental build cache ─────────────────────────────────────
+*.tsbuildinfo

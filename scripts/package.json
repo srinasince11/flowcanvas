@@ -1,0 +1,13 @@
+{
+  "name": "flowcanvas-scripts",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Developer tooling for FlowCanvas — not part of the application build.",
+  "scripts": {
+    "screenshots": "node capture-screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}
