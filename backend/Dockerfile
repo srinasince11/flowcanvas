@@ -4,6 +4,8 @@ WORKDIR /build
 
 # Copy the POM first so the dependency layer is cached independently of the
 # source code — a code-only change does not re-download the world.
+# .mvn/maven.config makes Maven retry patiently when Central rate-limits (HTTP 429).
+COPY .mvn ./.mvn
 COPY pom.xml .
 RUN mvn -B dependency:go-offline
 

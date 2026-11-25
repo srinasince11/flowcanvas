@@ -38,11 +38,11 @@ jobs:
       # container is required — the suite runs identically on a laptop and in CI.
       - name: Run backend tests
         working-directory: backend
-        run: mvn -B verify
+        run: mvn -B -s ../.github/maven-ci-settings.xml verify
 
       - name: Build the executable jar
         working-directory: backend
-        run: mvn -B -DskipTests package
+        run: mvn -B -s ../.github/maven-ci-settings.xml -DskipTests package
 
       - name: Upload the jar as a build artifact
         uses: actions/upload-artifact@v7
