@@ -746,6 +746,8 @@ kbd {
 }
 
 .flow-node__type {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: var(--fs-xs);
   font-weight: 650;
   color: var(--node-accent);
@@ -963,7 +965,7 @@ kbd {
 
 .trace {
   --seq-w: 20px;
-  --name-w: 148px;
+  --name-w: 196px;
   --dur-w: 62px;
   --gap: 10px;
   min-height: 0;
@@ -1239,6 +1241,7 @@ kbd {
 
 .history__duration {
   color: var(--ink-3);
+  white-space: nowrap;
 }
 
 /* ----------------------------------------------------------------- problems */

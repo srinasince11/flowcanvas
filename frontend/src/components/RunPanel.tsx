@@ -69,7 +69,7 @@ function RunHistory({
                 <span className="history__time">{formatTime(run.startedAt)}</span>
                 <span className="sr-only">{run.status}</span>
                 {run.durationMs !== undefined && run.durationMs !== null && (
-                  <span className="history__duration">{run.durationMs} ms</span>
+                  <span className="history__duration">{formatDuration(run.durationMs)}</span>
                 )}
               </button>
             </li>

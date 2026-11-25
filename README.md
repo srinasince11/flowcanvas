@@ -24,7 +24,7 @@ It runs **completely offline** with a deterministic mock AI provider, so the who
 is demonstrable with zero API budget — and a real provider (any OpenAI-compatible endpoint)
 is one environment variable away.
 
-![FlowCanvas — execution results](docs/screenshots/04-execution-results.png)
+![FlowCanvas: a branching workflow and its run trace](docs/screenshots/04-execution-results.png)
 
 ---
 
@@ -75,9 +75,10 @@ is one environment variable away.
 
 | | |
 |---|---|
-| **Empty state**<br>Clear guidance instead of a blank canvas.<br><br>![Empty state](docs/screenshots/01-empty-state.png) | **A loaded workflow**<br>Four typed nodes with live previews.<br><br>![Workflow loaded](docs/screenshots/02-workflow-loaded.png) |
-| **Node inspector**<br>Type-specific configuration for the selected node.<br><br>![Inspector](docs/screenshots/03-node-inspector.png) | **Execution results**<br>Per-node status, output and duration.<br><br>![Results](docs/screenshots/04-execution-results.png) |
-| **Canvas editing**<br>Delete an edge, drag a new connection.<br><br>![Editing](docs/screenshots/05-canvas-editing.png) | **Responsive layout**<br>Works down to a phone width.<br><br>![Mobile](docs/screenshots/06-responsive-mobile.png) |
+| **Start in one click**<br>The empty canvas offers the examples; parts drag in from the left.<br><br>![Empty state](docs/screenshots/01-empty-state.png) | **Fan-out and fan-in**<br>A question goes to an advocate and a critic in parallel, then both answers are joined by key.<br><br>![Branching workflow](docs/screenshots/02-workflow-loaded.png) |
+| **Variables in scope**<br>The join template sees exactly its ancestors: `{{advocate}}`, `{{critic}}`, `{{topic}}`.<br><br>![Inspector](docs/screenshots/03-node-inspector.png) | **The run trace**<br>One bar per node at its real start and duration; the final answer opens beside it.<br><br>![Run trace](docs/screenshots/04-execution-results.png) |
+| **Failure isolation**<br>One branch fails, the other still finishes, and only the nodes that depend on it are skipped.<br><br>![Failure isolation](docs/screenshots/05-failure-isolation.png) | **Problems caught as you type**<br>A `{{typo}}` is flagged before anything runs, with the fix one click away in the inspector.<br><br>![Live problems](docs/screenshots/06-live-problems.png) |
+| **Down to phone width**<br>Canvas first, then the trace and the panels, with no sideways scrolling.<br><br>![Phone layout](docs/screenshots/07-responsive-mobile.png) | |
 
 ---
 
@@ -188,7 +189,7 @@ sees one origin and CORS never enters the picture.
 |---|---|
 | `./scripts/dev-backend.sh start\|stop\|restart\|status` | Manages a local backend process. |
 | `./scripts/reset-db.sh` | Drops and recreates the database (then restart the backend to re-migrate). |
-| `node scripts/capture-screenshots.mjs` | Drives the real UI in a real browser and captures the README screenshots. |
+| `node scripts/capture-screenshots.mjs` | Drives the real UI in a real browser (23 end-to-end checks) and captures the README screenshots. Set `CHROME_PATH` to use an installed Chrome instead of downloading Playwright's. |
 
 ---
 

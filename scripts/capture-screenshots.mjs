@@ -1,8 +1,18 @@
 /**
  * End-to-end UI verification + screenshot capture.
  *
- * Drives the real application in a real browser against the real backend:
- * loads an example, runs the workflow, and captures the screenshots used in the README.
+ * Drives the real application in a real browser against the real backend: opens the
+ * branching example, inspects it, runs it, breaks one branch on purpose, introduces a
+ * template typo, and checks the phone layout, capturing the README screenshots on the
+ * way. Every capture is preceded by checks, so a screenshot is never taken of a broken
+ * state; the script exits non-zero if any check fails.
+ *
+ * Usage (app running on :5173 with its backend on :8080):
+ *   npm ci                                   # once; installs Playwright
+ *   node capture-screenshots.mjs             # uses Playwright's bundled Chromium
+ *   CHROME_PATH="C:/.../chrome.exe" node capture-screenshots.mjs   # or an installed Chrome
+ *
+ * The backend should be freshly seeded: the script runs and edits the example workflow.
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -10,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.FLOWCANVAS_URL ?? 'http://localhost:5173';
 const OUT = process.env.SHOT_DIR ?? fileURLToPath(new URL('../docs/screenshots', import.meta.url));
+const EXAMPLE = 'Balanced Research Brief';
 mkdirSync(OUT, { recursive: true });
 
 const errors = [];
@@ -20,9 +31,10 @@ function check(name, condition, detail = '') {
   console.log(`${condition ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+const browser = await chromium.launch(
+  process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {},
+);
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
-
 page.on('console', (message) => {
   if (message.type() === 'error') {
     errors.push(message.text());
@@ -30,93 +42,110 @@ page.on('console', (message) => {
 });
 page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
 
+const shot = async (name) => {
+  await page.mouse.move(0, 0); // no stray hover states in the picture
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: `${OUT}/${name}.png` });
+  console.log(`      captured ${name}.png`);
+};
+const node = (label) => page.locator('.flow-node', { has: page.locator('.flow-node__label', { hasText: label }) });
+const selectNode = async (label) => {
+  await node(label).locator('.flow-node__label').click();
+  await page.getByTestId('inspector').waitFor();
+};
+const setTemplate = async (text) => {
+  const template = page.getByTestId('inspector-template');
+  await template.fill(text);
+};
+const runAndWait = async () => {
+  await page.getByTestId('run-workflow').click();
+  await page.locator('.run-panel__status').filter({ hasText: /Succeeded|Failed/ }).waitFor({ timeout: 30000 });
+  await page.waitForTimeout(300);
+};
+
 await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.waitForSelector('.toolbar', { timeout: 15000 });
 
-// --- 1. Empty / library view ------------------------------------------------------
-// The canvas starts empty on purpose, so this is the "first run" experience.
-await page.waitForTimeout(700);
-await page.screenshot({ path: `${OUT}/01-empty-state.png` });
-check('app shell renders', (await page.locator('.toolbar').count()) === 1);
-check('library panel present', (await page.locator('.library').count()) === 1);
-check('palette present', (await page.locator('.palette').count()) === 1);
-check('empty canvas shows no nodes', (await page.locator('.flow-node').count()) === 0);
+// --- 1. First-run experience --------------------------------------------------------
+await page.locator('.canvas__example').first().waitFor();
+check('empty canvas invites the user in', await page.getByTestId('canvas-empty').isVisible());
+check('examples offered on the canvas', (await page.locator('.canvas__example').count()) >= 4);
+check('parts bin visible', await page.getByTestId('add-node-OUTPUT').isVisible());
+await shot('01-empty-state');
 
-// --- 2. Load an example workflow ---------------------------------------------------
-await page.getByTestId('example-Customer Support Reply').click();
-await page.waitForSelector('.flow-node', { timeout: 15000 });
+// --- 2. Open the branching example as a saved workflow ------------------------------
+// Opening the saved copy (rather than the example) means running it does not create
+// a duplicate entry in the library.
+const saved = await (await page.request.get(`${BASE}/api/v1/workflows?search=${encodeURIComponent(EXAMPLE)}`)).json();
+const workflowId = saved.items[0]?.id;
+check('example workflow is seeded', !!workflowId);
+await page.getByTestId(`workflow-open-${workflowId}`).click();
+await page.locator('.flow-node').nth(7).waitFor();
+await page.waitForTimeout(900); // fit-view animation
+check('fan-out graph has 8 nodes', (await page.locator('.flow-node').count()) === 8);
+check('and 8 cables', (await page.locator('.react-flow__edge').count()) === 8);
+await shot('02-workflow-loaded');
+
+// --- 3. The join template and the variables in scope --------------------------------
+await selectNode('Synthesis Prompt');
+const variables = await page.getByTestId('inspector-variables').innerText();
+check('join template sees both branches', /advocate/.test(variables) && /critic/.test(variables), variables.replace(/\n/g, ' '));
+check('key shown and editable', (await page.getByTestId('inspector-key').inputValue()) === 'synthesisPrompt');
+await shot('03-node-inspector');
+
+// --- 4. A successful run, drawn as a trace ------------------------------------------
+await page.locator('.canvas .react-flow__pane').click({ position: { x: 40, y: 40 } });
+await runAndWait();
+const trace = page.locator('.trace__row');
+check('trace has a row per node', (await trace.count()) === 8);
+check('every node succeeded', (await page.locator('.trace__row--success').count()) === 8);
+check('run succeeded', /Succeeded/.test(await page.locator('.run-panel__status').innerText()));
+check('final answer shown', /mock:/.test(await page.getByTestId('run-result').innerText()));
+await shot('04-execution-results');
+
+// --- 5. Failure isolation: break one branch -----------------------------------------
+await selectNode('Case For');
+await setTemplate('List the three strongest arguments FOR: {{input}} [[fail]]');
+await page.locator('.canvas .react-flow__pane').click({ position: { x: 40, y: 40 } });
+await runAndWait();
+check('run reports failure', /Failed/.test(await page.locator('.run-panel__status').innerText()));
+check('one node failed', (await page.locator('.trace__row--failed').count()) === 1);
+check('the other branch still finished', (await node('Critic').getAttribute('data-status')) === 'SUCCESS');
+check('downstream nodes skipped', (await page.locator('.trace__row--skipped').count()) === 3);
+check('error shown without a click', /asked to fail/.test(await page.getByTestId('run-result').innerText()));
+await shot('05-failure-isolation');
+
+// --- 6. Live problems: a template typo ----------------------------------------------
+await selectNode('Case For');
+await setTemplate('List the three strongest arguments FOR: {{topik}}');
+await page.getByRole('tab', { name: /Problems/ }).click();
+const problems = await page.getByTestId('validation-panel').innerText();
+check('typo reported before running', /topik/.test(problems) && /blocks this workflow/.test(problems));
+check('run disabled while broken', await page.getByTestId('run-workflow').isDisabled());
+check('offending node outlined', (await node('Case For').getAttribute('class')).includes('has-problem'));
+await shot('06-live-problems');
+
+// Put the template back and save, leaving the data as it was found.
+await setTemplate('List the three strongest arguments FOR: {{input}}');
+await page.getByTestId('save-workflow').click();
+await page.getByTestId('toast').waitFor();
+await page.getByTestId('toast').waitFor({ state: 'detached', timeout: 10000 });
+await page.getByRole('tab', { name: 'Run' }).click();
+await page.locator('.canvas .react-flow__pane').click({ position: { x: 40, y: 40 } });
+await runAndWait(); // the phone shot shows a healthy run, not the deliberately broken one
+check('repaired workflow runs again', /Succeeded/.test(await page.locator('.run-panel__status').innerText()));
+
+// --- 7. Phone layout ----------------------------------------------------------------
+await page.setViewportSize({ width: 430, height: 932 });
+await page.waitForTimeout(1000); // let the layout and the canvas re-measure
+await page.locator('.react-flow__controls-fitview').click();
 await page.waitForTimeout(900);
-const nodeCount = await page.locator('.flow-node').count();
-const edgeCount = await page.locator('.react-flow__edge').count();
-check('example loads 4 nodes', nodeCount === 4, `got ${nodeCount}`);
-check('example loads 3 edges', edgeCount === 3, `got ${edgeCount}`);
-await page.screenshot({ path: `${OUT}/02-workflow-loaded.png` });
-
-// --- 3. Select a node to show the inspector ----------------------------------------
-await page.locator('.flow-node').nth(1).click();
-await page.waitForTimeout(400);
-check('inspector opens on select', (await page.getByTestId('inspector').count()) === 1);
-await page.screenshot({ path: `${OUT}/03-node-inspector.png` });
-
-// --- 4. Validate --------------------------------------------------------------------
-await page.getByTestId('validate-workflow').click();
-await page.waitForTimeout(1200);
-const validationText = await page.getByTestId('validation-panel').innerText();
-check('validation reports the workflow as valid', /Valid/.test(validationText), validationText.replace(/\n/g, ' | '));
-
-// --- 5. Run -------------------------------------------------------------------------
-await page.getByTestId('run-workflow').click();
-await page.waitForSelector('.run-item', { timeout: 20000 });
-await page.waitForTimeout(1500);
-const runItems = await page.locator('.run-item').count();
-check('run produced results for every node', runItems === 4, `got ${runItems}`);
-const runText = await page.getByTestId('run-panel').innerText();
-check('run panel shows a SUCCESS status', /SUCCESS/.test(runText));
-check('run panel shows durations', /ms/.test(runText));
-check('run panel shows node outputs', /mock/.test(runText), 'expected the mock provider output');
-await page.screenshot({ path: `${OUT}/04-execution-results.png` });
-
-// --- 6. Delete and re-create a connection ------------------------------------------
-// Selecting an edge and pressing Delete removes it; dragging from a source handle to a
-// target handle creates one. Verifying both exercises the core editing loop.
-await page.locator('.react-flow__edge').last().click({ force: true });
-await page.waitForTimeout(300);
-await page.keyboard.press('Delete');
-await page.waitForTimeout(500);
-const afterDelete = await page.locator('.react-flow__edge').count();
-check('selecting an edge and deleting removes it', afterDelete === 2, `got ${afterDelete}`);
-
-const sourceHandle = page.locator('.flow-node').nth(2).locator('.react-flow__handle.source');
-const targetHandle = page.locator('.flow-node').nth(3).locator('.react-flow__handle.target');
-const sourceBox = await sourceHandle.boundingBox();
-const targetBox = await targetHandle.boundingBox();
-check('source and target handles are on screen', !!sourceBox && !!targetBox);
-
-if (sourceBox && targetBox) {
-  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
-  await page.mouse.down();
-  // React Flow needs a moment and a few intermediate moves to start a connection.
-  await page.waitForTimeout(150);
-  await page.mouse.move(sourceBox.x + 40, sourceBox.y, { steps: 5 });
-  await page.waitForTimeout(120);
-  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 20 });
-  await page.waitForTimeout(200);
-  await page.mouse.up();
-  await page.waitForTimeout(700);
-}
-const afterConnect = await page.locator('.react-flow__edge').count();
-check('dragging between handles creates a connection', afterConnect === 3, `got ${afterConnect}`);
-await page.screenshot({ path: `${OUT}/05-canvas-editing.png` });
-
-// --- 7. Responsive view -------------------------------------------------------------
-await page.setViewportSize({ width: 430, height: 900 });
-await page.waitForTimeout(700);
-await page.screenshot({ path: `${OUT}/06-responsive-mobile.png`, fullPage: false });
-check('mobile layout renders', (await page.locator('.toolbar').count()) === 1);
+const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+check('no sideways scrolling on a phone', overflow <= 0, `overflow ${overflow}px`);
+await shot('07-responsive-mobile');
 
 // --- Report -------------------------------------------------------------------------
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
-
 await browser.close();
 
 const failed = results.filter((r) => !r.ok);
